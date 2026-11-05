@@ -1,0 +1,31 @@
+# headroom binary
+[package]
+name = "headroom-cli"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[lib]
+name = "headroom_cli"
+path = "src/lib.rs"
+
+[[bin]]
+name = "headroom"
+path = "src/main.rs"
+
+[dependencies]
+headroom-core = { path = "../headroom-core" }
+headroom-store = { path = "../headroom-store" }
+headroom-proxy = { path = "../headroom-proxy" }
+headroom-mcp = { path = "../headroom-mcp" }
+clap = { workspace = true, features = ["env"] }
+tokio = { workspace = true }
+anyhow = { workspace = true }
+serde_json = { workspace = true }
+reqwest = { workspace = true }
+sha2 = { workspace = true }
+hex = { workspace = true }
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"

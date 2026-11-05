@@ -1,0 +1,22 @@
+# Local LLM optimization proxy
+[package]
+name = "headroom-proxy"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+headroom-core = { path = "../headroom-core" }
+headroom-store = { path = "../headroom-store" }
+tokio = { workspace = true }
+axum = { workspace = true }
+reqwest = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+futures-util = { workspace = true }
+anyhow = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+thiserror = { workspace = true }
+bytes = "1"
