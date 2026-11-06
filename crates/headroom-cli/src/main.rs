@@ -90,8 +90,15 @@ enum Commands {
         /// The CCR hash (12-24 hex) or a full marker.
         hash: String,
     },
-    /// Run the MCP stdio server (tools: compress, retrieve, stats).
-    Mcp,
+    /// Run the MCP stdio server (tools: compress, retrieve, stats, read).
+    Mcp {
+        /// Accept the Python-style "serve" word for drop-in compatibility.
+        #[arg(default_value = "serve")]
+        command: String,
+        /// Proxy URL for proxy-store fallback.
+        #[arg(long, env = "HEADROOM_PROXY_URL")]
+        proxy_url: Option<String>,
+    },
     /// Manage memories stored in Headroom.
     Memory {
         #[command(subcommand)]
@@ -271,7 +278,12 @@ async fn main() -> Result<()> {
         Commands::Doctor { port } => doctor(port).await,
         Commands::Savings { json, reset } => savings(json, reset),
         Commands::Retrieve { hash } => retrieve(&hash),
-        Commands::Mcp => run_mcp(),
+        Commands::Mcp { command, proxy_url } => {
+            if command != "serve" {
+                anyhow::bail!("unknown mcp subcommand: {command} (only 'serve' is supported)");
+            }
+            run_mcp(proxy_url)
+        }
         Commands::Memory { cmd } => headroom_cli::memory_cmd::run(cmd),
         Commands::Perf { hours, format } => headroom_cli::perf::run(hours, format),
         Commands::Inspect { last, json } => headroom_cli::inspect::run(last, json),
@@ -533,7 +545,7 @@ fn retrieve(hash: &str) -> Result<()> {
     }
 }
 
-fn run_mcp() -> Result<()> {
+fn run_mcp(proxy_url: Option<String>) -> Result<()> {
     let store = match CompressionStore::open(&StoreConfig::default()) {
         Ok(s) => Some(s),
         Err(e) => {
@@ -544,8 +556,7 @@ fn run_mcp() -> Result<()> {
     let ctx = headroom_mcp::server::McpContext {
         store,
         ledger: SavingsLedger::open_default(),
-        proxy_url: std::env::var("HEADROOM_PROXY_URL")
-            .unwrap_or_else(|_| "http://127.0.0.1:8787".into()),
+        proxy_url: proxy_url.unwrap_or_else(|| "http://127.0.0.1:8787".into()),
         read_cache: Default::default(),
     };
     headroom_mcp::server::serve_stdio(ctx)

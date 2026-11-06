@@ -487,6 +487,52 @@ fn message_tool_name(
 // Re-export for callers that need the raw hash helper.
 pub use headroom_core::ccr::ccr_hash as hash_of;
 
+/// The retrieve tool name (matches the Python headroom).
+pub const RETRIEVE_TOOL_NAME: &str = "headroom_retrieve";
+
+fn retrieve_tool_schema() -> Value {
+    json!({
+        "type": "object",
+        "properties": {"hash": {"type": "string"}},
+        "required": ["hash"]
+    })
+}
+
+fn retrieve_tool_description() -> String {
+    "Retrieve the original (pre-compression) content by hash from a compression marker. Use when you need the full text behind a 'Retrieve more: hash=...' or '<<ccr:...>>' marker.".to_string()
+}
+
+/// Inject the retrieve tool into a request body when the compression pass
+/// emitted CCR markers (mirrors the Python CCRToolInjector). Idempotent.
+pub fn inject_retrieve_tool(body: &mut Value, format: WireFormat) {
+    let tool = match format {
+        WireFormat::Anthropic => json!({
+            "name": RETRIEVE_TOOL_NAME,
+            "description": retrieve_tool_description(),
+            "input_schema": retrieve_tool_schema(),
+        }),
+        WireFormat::OpenAi => json!({
+            "type": "function",
+            "function": {
+                "name": RETRIEVE_TOOL_NAME,
+                "description": retrieve_tool_description(),
+                "parameters": retrieve_tool_schema(),
+            }
+        }),
+    };
+    let Some(obj) = body.as_object_mut() else { return };
+    let tools = obj.entry("tools").or_insert_with(|| Value::Array(Vec::new()));
+    let Value::Array(arr) = tools else { return };
+    let exists = arr.iter().any(|t| {
+        t.get("name") == Some(&json!(RETRIEVE_TOOL_NAME))
+            || t.get("function").and_then(|f| f.get("name"))
+                == Some(&json!(RETRIEVE_TOOL_NAME))
+    });
+    if !exists {
+        arr.push(tool);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

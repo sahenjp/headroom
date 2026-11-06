@@ -369,9 +369,14 @@ async fn handle_provider_request(
         &config,
         state.store.as_ref(),
     ) {
-        Ok(CompressOutcome::Compressed { body, summary }) => {
+        Ok(CompressOutcome::Compressed { mut body, summary }) => {
             state.requests_compressed.fetch_add(1, Ordering::Relaxed);
             state.metrics.inc("headroom_compressed_total", &[]);
+            // CCR markers present -> make sure the model can retrieve.
+            if !summary.ccr_hashes.is_empty() {
+                crate::compress_request::inject_retrieve_tool(&mut body, format);
+                state.metrics.inc("headroom_retrieve_tool_injected", &[]);
+            }
             (serde_json::to_vec(&body).unwrap_or_default(), Some(summary))
         }
         Ok(CompressOutcome::Unchanged { .. }) => (body.to_vec(), None),
@@ -463,6 +468,22 @@ fn record_savings(
     }
 }
 
+/// Pick the upstream for an unrouted path. OpenAI/Codex surfaces first
+/// (matches the Python proxy's route map), Anthropic as the default.
+fn select_api(path: &str) -> Api {
+    const OPENAI_PREFIXES: &[&str] = &[
+        "/v1/chat", "/chat/", "/v1/responses", "/responses", "/v1/codex", "/codex",
+        "/backend-api", "/v1/live", "/live", "/v1/models", "/v1/embeddings",
+        "/v1/moderations", "/v1/audio", "/v1/images", "/v1/realtime",
+        "/v1/alpha/search",
+    ];
+    if OPENAI_PREFIXES.iter().any(|p| path.starts_with(p)) {
+        Api::OpenAi
+    } else {
+        Api::Anthropic
+    }
+}
+
 fn client_label(headers: &HeaderMap) -> String {
     headers
         .get("user-agent")
@@ -473,11 +494,7 @@ fn client_label(headers: &HeaderMap) -> String {
 
 /// Catch-all: forward every unrouted path verbatim to the matching upstream.
 async fn passthrough(State(state): State<SharedState>, req: Request) -> Response {
-    let api = if req.uri().path().contains("/chat/completions") {
-        Api::OpenAi
-    } else {
-        Api::Anthropic
-    };
+    let api = select_api(req.uri().path());
     let method = req.method().clone();
     let path_query = req
         .uri()
