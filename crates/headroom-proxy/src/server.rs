@@ -11,8 +11,6 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
-use futures_util::StreamExt;
-
 use axum::body::Body;
 use axum::extract::{Path, Request, State};
 use axum::http::{HeaderMap, HeaderName, HeaderValue, Method, StatusCode};
@@ -28,7 +26,7 @@ use crate::compress_request::{
     WireFormat,
 };
 use crate::upstream::{Api, Upstream};
-use crate::budget::{self, Budget, BudgetDecision, BudgetPeriod};
+use crate::budget::{self, Budget, BudgetDecision};
 use crate::metrics::Metrics;
 use crate::rate_limit::{RateDecision, RateLimiter};
 use crate::session::{session_key, SessionTracker};
