@@ -5,18 +5,12 @@
 //! a large `output` string are compressed — mirroring the chat-completions
 //! tool-message handling via the same content-type routing.
 
-use headroom_core::content::{detect_content_type, ContentType};
 use headroom_core::tokens::EstimatingTokenCounter;
-use headroom_core::transforms::diff_compressor::DiffCompressor;
-use headroom_core::transforms::log_compressor::LogCompressor;
-use headroom_core::transforms::search_compressor::SearchCompressor;
-use headroom_core::transforms::smart_crusher::SmartCrusher;
-use headroom_core::transforms::text_crusher::TextCrusher;
 use headroom_store::ccr::CompressionStore;
 use serde_json::Value;
 
 use crate::compress_request::{
-    compress_text_in_place, stash, CompressError, CompressOutcome, CompressionSummary,
+    compress_text_in_place, CompressError, CompressOutcome, CompressionSummary,
     RequestCompressConfig,
 };
 
@@ -67,31 +61,6 @@ pub fn compress_responses_body(
     let mut rewritten = body.clone();
     rewritten["input"] = Value::Array(items);
     Ok(CompressOutcome::Compressed { body: rewritten, summary })
-}
-
-// Keep the unused imports referenced (search/log/diff/crusher are used via
-// compress_text_in_place's routing; the direct constructors stay for
-// callers that want per-type compression of Responses items).
-#[allow(dead_code)]
-fn _type_router_probe(text: &str) -> &'static str {
-    match detect_content_type(text) {
-        ContentType::SearchResults => "search",
-        ContentType::BuildOutput => "log",
-        ContentType::GitDiff => "diff",
-        ContentType::JsonArray => "json",
-        ContentType::PlainText => "text",
-        _ => "other",
-    }
-}
-
-#[allow(dead_code)]
-fn _probe_stash(store: Option<&CompressionStore>) {
-    let _ = stash;
-    let _ = SearchCompressor::default();
-    let _ = LogCompressor::default();
-    let _ = DiffCompressor::default();
-    let _ = SmartCrusher::default();
-    let _ = TextCrusher::default();
 }
 
 #[cfg(test)]
